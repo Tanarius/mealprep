@@ -8,8 +8,8 @@
  * Environment variables required:
  *   STRIPE_SECRET_KEY       — sk_live_... or sk_test_...
  *   STRIPE_WEBHOOK_SECRET   — whsec_... (from Stripe Dashboard → Webhooks)
- *   STRIPE_PRICE_MONTHLY    — price_... for $6/month recurring
- *   STRIPE_PRICE_ANNUAL     — price_... for $49/year recurring
+ *   STRIPE_PRICE_MONTHLY    — price_... for $4.99/month recurring
+ *   STRIPE_PRICE_ANNUAL     — optional; annual plan is not currently offered in the UI
  *   CLIENT_URL              — full origin for success/cancel redirects (e.g. https://simmer.up.railway.app)
  */
 

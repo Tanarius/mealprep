@@ -24,12 +24,12 @@ const PERKS = [
 
 export function UpgradeModal({ open, onClose, reason }: UpgradeModalProps) {
   const { toast } = useToast();
-  const [loading, setLoading] = useState<"monthly" | "annual" | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function handleUpgrade(plan: "monthly" | "annual") {
-    setLoading(plan);
+  async function handleUpgrade() {
+    setLoading(true);
     try {
-      const res = await apiRequest("POST", "/api/billing/create-checkout", { plan });
+      const res = await apiRequest("POST", "/api/billing/create-checkout", { plan: "monthly" });
       const data = await res.json();
       if (data.error) {
         toast({ title: "Couldn't start checkout", description: data.error, variant: "destructive" });
@@ -40,7 +40,7 @@ export function UpgradeModal({ open, onClose, reason }: UpgradeModalProps) {
     } catch (err: any) {
       toast({ title: "Couldn't start checkout", description: err.message, variant: "destructive" });
     } finally {
-      setLoading(null);
+      setLoading(false);
     }
   }
 
@@ -68,35 +68,18 @@ export function UpgradeModal({ open, onClose, reason }: UpgradeModalProps) {
           ))}
         </ul>
 
-        {/* Pricing options */}
-        <div className="grid grid-cols-2 gap-3 mt-2">
-          <button
-            onClick={() => handleUpgrade("monthly")}
-            disabled={!!loading}
-            className={cn(
-              "rounded-xl border border-border p-4 text-left transition-colors hover:border-orange-500/50 hover:bg-orange-500/5",
-              loading === "monthly" && "opacity-60 cursor-wait"
-            )}
-          >
-            <p className="font-semibold text-base">$6 / month</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Cancel anytime</p>
-          </button>
-
-          <button
-            onClick={() => handleUpgrade("annual")}
-            disabled={!!loading}
-            className={cn(
-              "rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 text-left transition-colors hover:border-amber-500/70 hover:bg-amber-500/10 relative",
-              loading === "annual" && "opacity-60 cursor-wait"
-            )}
-          >
-            <span className="absolute -top-2.5 left-3 text-[10px] bg-amber-500 text-black px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
-              Best value
-            </span>
-            <p className="font-semibold text-base">$49 / year</p>
-            <p className="text-xs text-muted-foreground mt-0.5">$4.08/mo · save 32%</p>
-          </button>
-        </div>
+        {/* Pricing */}
+        <button
+          onClick={handleUpgrade}
+          disabled={loading}
+          className={cn(
+            "mt-2 w-full rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 text-center transition-colors hover:border-amber-500/70 hover:bg-amber-500/10",
+            loading && "opacity-60 cursor-wait"
+          )}
+        >
+          <p className="font-semibold text-base">$4.99 / month</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Cancel anytime</p>
+        </button>
 
         <p className="text-[11px] text-center text-muted-foreground">
           One subscription covers your entire household. Powered by Stripe — cancel anytime.

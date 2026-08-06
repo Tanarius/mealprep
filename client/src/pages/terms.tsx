@@ -37,7 +37,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-lg font-semibold mb-3">4. Subscriptions and Billing</h2>
-            <p className="mb-3">Simmer offers a free tier and a Premium subscription ($6/month or $49/year). Billing is processed by Stripe. By subscribing, you agree to recurring charges until you cancel.</p>
+            <p className="mb-3">Simmer offers a free tier and a Premium subscription ($4.99/month). Billing is processed by Stripe. By subscribing, you agree to recurring charges until you cancel.</p>
             <ul className="list-disc list-inside space-y-2 text-foreground/80">
               <li>You may cancel your subscription at any time through the billing portal.</li>
               <li>Cancellation takes effect at the end of your current billing period.</li>

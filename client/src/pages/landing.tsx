@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 
 const scrollTo = (id: string) =>
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
@@ -140,7 +140,6 @@ function HouseholdMock() {
 // ─── Landing page ──────────────────────────────────────────────────────────
 
 export default function LandingPage() {
-  const [annual, setAnnual] = useState(false);
   useScrollReveal();
 
   const features: Array<{
@@ -412,21 +411,6 @@ export default function LandingPage() {
             <p style={{ color: "#9A8A7A", fontSize: 15, margin: 0 }}>Start free, upgrade when you're ready.</p>
           </div>
 
-          {/* Billing toggle */}
-          <div className="fade-in-up" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 14, marginBottom: 44 }}>
-            <span style={{ fontSize: 14, color: annual ? "#9A8A7A" : "#F5EDE3", fontWeight: 600 }}>Monthly</span>
-            <button
-              onClick={() => setAnnual(a => !a)}
-              style={{ width: 46, height: 26, borderRadius: 13, background: annual ? "#C96A3A" : "#3A2A20", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s", flexShrink: 0 }}
-            >
-              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#F5EDE3", position: "absolute", top: 3, left: annual ? 23 : 3, transition: "left 0.2s" }} />
-            </button>
-            <span style={{ fontSize: 14, color: annual ? "#F5EDE3" : "#9A8A7A", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-              Annual
-              <span style={{ background: "#3D5A47", color: "#F5EDE3", borderRadius: 10, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>Save 33%</span>
-            </span>
-          </div>
-
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24 }}>
             {/* Free */}
             <div className="fade-in-up" style={{ background: "#2A1F18", borderRadius: 22, padding: 34, border: "1px dashed #3A2A20", display: "flex", flexDirection: "column" }}>
@@ -453,11 +437,11 @@ export default function LandingPage() {
               </div>
               <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Simmer Pro</h3>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 2 }}>
-                <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: "-0.03em" }}>{annual ? "$3.33" : "$4.99"}</div>
+                <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: "-0.03em" }}>$4.99</div>
                 <div style={{ fontSize: 14, color: "#9A8A7A" }}>/ mo</div>
               </div>
               <div style={{ fontSize: 13, color: "#9A8A7A", marginBottom: 30 }}>
-                {annual ? "billed $39.99 / year" : "billed monthly"}
+                billed monthly
               </div>
               <div style={{ flex: 1 }}>
                 {proFeatures.map(f => (
