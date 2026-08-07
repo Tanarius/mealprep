@@ -7,6 +7,11 @@ interface CacheEntry<T> {
 
 const MAX_CACHE_ENTRIES = 500;
 
+// LIMITATION: this cache is a process-local Map. It empties on every Railway
+// restart/deploy, and it would NOT be shared across instances if the app ever runs
+// more than one — so its cost savings are smaller than they look, and it silently
+// stops deduplicating the moment there are two processes. Fine at current scale;
+// migrate to Redis (or similar) before scaling horizontally.
 class InMemCache {
   private store: Map<string, CacheEntry<any>> = new Map();
 

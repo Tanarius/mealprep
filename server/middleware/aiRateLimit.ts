@@ -85,6 +85,9 @@ function chargeOnSuccess(res: Response, hookedFlag: string, charge: () => Promis
   if ((res.locals as any)[hookedFlag]) return;
   (res.locals as any)[hookedFlag] = true;
   res.on("finish", () => {
+    // Cache-served responses made no Anthropic call — they cost nothing, so they
+    // charge nothing (handlers set res.locals.servedFromCache on cache hits).
+    if (res.locals.servedFromCache) return;
     if (res.statusCode >= 200 && res.statusCode < 300) {
       charge().catch(err => console.error("[rateLimit] quota charge failed:", err));
     }

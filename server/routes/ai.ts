@@ -358,7 +358,11 @@ router.post("/suggest", async (req, res, next) => {
     const cacheKey = aiCache.generateKey('suggest', { ingredientList, prefs });
     const cached = aiCache.get<{recipes: any[]}>(cacheKey);
     if (cached) {
-      return res.json({ recipes: cached.recipes, callsRemaining: 9999, cached: true });
+      // Cache hit: no Anthropic call, so no quota charge (the finish-hook skips when
+      // servedFromCache is set). The middleware's remaining count assumed a pending
+      // charge (limit - used - 1); uncharged, the real remaining is one higher.
+      res.locals.servedFromCache = true;
+      return res.json({ recipes: cached.recipes, callsRemaining: res.locals.aiCallsRemaining + 1, cached: true });
     }
 
     const recipes = await suggestRecipesFromPantry(ingredientList, prefs);
@@ -407,7 +411,9 @@ router.post("/weekly-plan", async (req, res, next) => {
     const cacheKey = aiCache.generateKey('weekly', { schedule, recipeIds: recipeList.map(r => r.id), cookingStyles });
     const cached = aiCache.get<{ meals: Record<string, number> }>(cacheKey);
     if (cached) {
-      return res.json({ meals: cached.meals, callsRemaining: 9999, cached: true });
+      // Cache hit: no charge (see /suggest above) — report the uncharged remaining count.
+      res.locals.servedFromCache = true;
+      return res.json({ meals: cached.meals, callsRemaining: res.locals.aiCallsRemaining + 1, cached: true });
     }
 
     const meals = await selectWeeklyMeals(recipeList, schedule, recentMealIds, cookingStyles);
