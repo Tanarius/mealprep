@@ -54,7 +54,6 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="px-4 py-4">
         <Link href="/" className="flex items-center gap-2.5 no-underline">
-          {/* TODO: Replace with <SimmerLogo /> SVG component */}
           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#C96A3A] text-white font-bold text-base shrink-0 select-none">
             S
           </div>
