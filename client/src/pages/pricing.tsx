@@ -1,17 +1,31 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, Sparkles, Zap, Utensils, CalendarDays, ShoppingCart, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function PricingPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [loading, setLoading] = useState(false);
 
-  const handleUpgrade = () => {
-    toast({
-      title: "Coming Soon!",
-      description: "Premium subscriptions will be available in the next update.",
-    });
+  const handleUpgrade = async () => {
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/billing/create-checkout", { plan: "monthly" });
+      const data = await res.json();
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch (err: any) {
+      if (err?.status === 401) {
+        setLocation("/auth");
+        return;
+      }
+      toast({ title: "Couldn't start checkout", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -103,8 +117,9 @@ export default function PricingPage() {
             <Button
               className="w-full py-6 rounded-xl bg-[#C96A3A] hover:bg-[#A85530] text-white font-semibold text-lg hover:scale-[1.02] transition-all shadow-lg border-0"
               onClick={handleUpgrade}
+              disabled={loading}
             >
-              Get Premium
+              {loading ? "Opening checkout…" : "Get Premium"}
             </Button>
           </div>
 

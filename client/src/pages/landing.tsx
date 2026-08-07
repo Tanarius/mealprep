@@ -451,10 +451,10 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
-              <a href="/#/pricing" style={{ display: "block", textAlign: "center", background: "#C96A3A", color: "#F5EDE3", padding: "13px 0", borderRadius: 10, fontSize: 15, fontWeight: 700, textDecoration: "none", marginTop: 30 }}>
-                Start free trial
+              <a href="/#/auth" style={{ display: "block", textAlign: "center", background: "#C96A3A", color: "#F5EDE3", padding: "13px 0", borderRadius: 10, fontSize: 15, fontWeight: 700, textDecoration: "none", marginTop: 30 }}>
+                Start for free
               </a>
-              <p style={{ fontSize: 12, color: "#5A4A3A", textAlign: "center", margin: "12px 0 0" }}>7-day free trial. Cancel anytime.</p>
+              <p style={{ fontSize: 12, color: "#5A4A3A", textAlign: "center", margin: "12px 0 0" }}>$4.99/month. Cancel anytime.</p>
             </div>
           </div>
         </section>

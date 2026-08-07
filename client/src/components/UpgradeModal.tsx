@@ -19,7 +19,7 @@ const PERKS = [
   "Unlimited social media screenshot imports",
   "Up to 6 household members",
   "Full activity feed history",
-  "Nutrition data on recipes (coming soon)",
+  "Nutrition data on recipes",
 ];
 
 export function UpgradeModal({ open, onClose, reason }: UpgradeModalProps) {
