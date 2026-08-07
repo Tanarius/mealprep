@@ -27,6 +27,8 @@ export function UpgradeModal({ open, onClose, reason }: UpgradeModalProps) {
 
   async function handleUpgrade() {
     setLoading(true);
+    // Funnel analytics — fire-and-forget, never blocks checkout
+    apiRequest("POST", "/api/events", { event: "upgrade_clicked", properties: { source: "upgrade_modal" } }).catch(() => {});
     try {
       const res = await apiRequest("POST", "/api/billing/create-checkout", { plan: "monthly" });
       const data = await res.json();

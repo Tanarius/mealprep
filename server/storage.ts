@@ -4,7 +4,7 @@ import {
   recipes, weeklyPlans, pantryStaples, users, households,
   userPreferences, userOnboarding, onboardingSwipes,
   userTasteProfile, householdTasteProfile, copilotSessions, activityLog, mealReactions,
-  snackWishlist, shoppingListItems
+  snackWishlist, shoppingListItems, events
 } from "@shared/schema";
 import type {
   Recipe, InsertRecipe, WeeklyPlan, InsertWeeklyPlan,
@@ -59,6 +59,10 @@ export interface IStorage {
   getGlobalAiCallsToday(): Promise<number>;
   incrementGlobalAiCalls(units: number): Promise<void>;
   claimGlobalAiAlert(kind: "soft" | "hard"): Promise<boolean>;
+
+  // Product analytics
+  logEvent(userId: number | null, event: string, properties?: Record<string, unknown>): Promise<void>;
+  getEventCounts(days: number): Promise<Array<{ event: string; count: number }>>;
   updateUserSubscriptionTier(userId: number, tier: string): Promise<void>;
   setStripeCustomer(userId: number, customerId: string): Promise<void>;
   setStripeSubscription(userId: number, subscriptionId: string | null): Promise<void>;
@@ -216,6 +220,19 @@ export class DatabaseStorage implements IStorage {
       )
     `);
     await pool.query(`INSERT INTO global_ai_usage (id) VALUES (1) ON CONFLICT DO NOTHING`);
+
+    // First-party product analytics events
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS events (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER,
+        event TEXT NOT NULL,
+        properties JSONB,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS events_event_created_idx ON events(event, created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS events_user_idx ON events(user_id)`);
 
     // Performance indexes
     await pool.query(`CREATE INDEX IF NOT EXISTS onboarding_swipes_user_idx ON onboarding_swipes(user_id, created_at DESC)`);
@@ -419,6 +436,29 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
+  // ── Product analytics ──────────────────────────────────────────────────────
+  // Fire-and-forget: analytics failures must never affect the request path, so
+  // this swallows (and logs) its own errors and never throws.
+  async logEvent(userId: number | null, event: string, properties?: Record<string, unknown>): Promise<void> {
+    try {
+      await db.insert(events).values({ userId, event, properties: properties ?? null });
+    } catch (err) {
+      console.error("[analytics] logEvent failed:", (err as any)?.message);
+    }
+  }
+
+  // Basic funnel query for the admin/dev summary: event counts over the last N days.
+  async getEventCounts(days: number): Promise<Array<{ event: string; count: number }>> {
+    const { rows } = await pool.query(
+      `SELECT event, COUNT(*)::int AS count
+       FROM events
+       WHERE created_at > NOW() - ($1 || ' days')::interval
+       GROUP BY event ORDER BY count DESC`,
+      [String(days)]
+    );
+    return rows;
+  }
+
   // Atomically claims today's soft/hard alert: true for exactly one caller per day,
   // so warnings and Sentry captures fire once instead of per request.
   async claimGlobalAiAlert(kind: "soft" | "hard"): Promise<boolean> {
@@ -476,6 +516,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       // User-scoped data (all FK to users.id).
+      await tx.delete(events).where(eq(events.userId, userId));
       await tx.delete(activityLog).where(eq(activityLog.userId, userId));
       await tx.delete(copilotSessions).where(eq(copilotSessions.userId, userId));
       await tx.delete(mealReactions).where(eq(mealReactions.userId, userId));

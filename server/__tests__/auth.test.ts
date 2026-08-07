@@ -39,6 +39,8 @@ vi.mock("../storage", () => ({
     setResetToken: vi.fn(),
     getUserByResetToken: vi.fn(),
     clearResetToken: vi.fn(),
+    getHouseholdMembers: vi.fn(async () => []),
+    logEvent: vi.fn(async () => {}),
   },
 }));
 

@@ -287,6 +287,17 @@ export async function registerRoutes(server: Server, app: Express) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // Funnel summary (event counts, last N days; default 30) — dev only
+  app.get("/api/dev/events-summary", async (req, res) => {
+    try {
+      const days = Math.min(365, Math.max(1, parseInt(String(req.query.days ?? "30"), 10) || 30));
+      const counts = await storage.getEventCounts(days);
+      res.json({ days, counts });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
   } // end dev-only block
 
   // === TASTE PROFILE ===
@@ -587,6 +598,7 @@ export async function registerRoutes(server: Server, app: Express) {
     if (req.body.mealMeta !== undefined) (planData as any).mealMeta = req.body.mealMeta;
     const plan = await storage.upsertWeeklyPlan(planData);
     res.json(plan);
+    storage.logEvent((req.user as any).id, "week_planned", { weekStart: parsed.data.weekStart });
     // Diff-based activity logging — log each newly added recipe
     if (existing?.meals !== parsed.data.meals) {
       const userId = (req.user as any).id;
@@ -1229,5 +1241,21 @@ ${pageText.substring(0, 6000)}`;
 
     const { totalItems, categories } = buildShoppingList(allIngredients, stapleNames);
     res.json({ totalItems, recipeCount: recipeIds.length, categories });
+    storage.logEvent((req.user as any).id, "shopping_list_generated", { recipeCount: recipeIds.length, totalItems });
+  });
+
+  // === PRODUCT ANALYTICS ===
+  // Client-originated events only; server-side funnel events are logged at their
+  // source. Strict allowlist — the client cannot invent event names, and no PII
+  // beyond the session's user id is stored.
+  const CLIENT_EVENTS = new Set(["upgrade_clicked"]);
+  app.post("/api/events", requireAuth, async (req, res) => {
+    const { event, properties } = (req.body ?? {}) as { event?: unknown; properties?: any };
+    if (typeof event !== "string" || !CLIENT_EVENTS.has(event)) {
+      return res.status(400).json({ error: "Unknown event" });
+    }
+    const source = typeof properties?.source === "string" ? properties.source.slice(0, 40) : undefined;
+    await storage.logEvent((req.user as any).id, event, source ? { source } : undefined);
+    res.json({ ok: true });
   });
 }

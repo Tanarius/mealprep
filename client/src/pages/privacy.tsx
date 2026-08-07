@@ -83,6 +83,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold mb-3">9. Cookies and Storage</h2>
             <p>We use session cookies for authentication (httpOnly, Secure in production). We use localStorage to save UI preferences (theme, dismissed banners, shopping list state). We do not use third-party tracking or advertising cookies.</p>
+            <p className="mt-3">We record first-party product events (for example: account created, onboarding completed, week planned, upgrade clicked) tied to your account id, to understand which features are used and improve the Service. These events contain no personal information beyond your account id, are stored on our own infrastructure, are never shared with third parties, and are deleted with your account.</p>
           </section>
 
           <section>

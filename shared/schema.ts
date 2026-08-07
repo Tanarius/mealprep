@@ -9,6 +9,16 @@ export const households = pgTable('households', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// First-party product analytics. One row per event; properties never contain PII
+// beyond the user id (which is scrubbed on account deletion via deleteUserData).
+export const events = pgTable("events", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id"),
+  event: text("event").notNull(),
+  properties: jsonb("properties"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),

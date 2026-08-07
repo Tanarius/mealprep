@@ -177,6 +177,7 @@ export function setupAuth(app: Express) {
 
       req.login(updatedUser!, (err) => {
         if (err) return next(err);
+        storage.logEvent(user.id, "registered", { withInvite: !!rawCode });
         res.status(201).json(safeUser(updatedUser));
       });
     } catch (err) {

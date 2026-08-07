@@ -118,6 +118,7 @@ export async function aiRateLimit(req: Request, res: Response, next: NextFunctio
     if ((req.body as any)?.mode === "image") {
       const importLimit = tier === 'free' ? FREE_MONTHLY_IMPORTS : PREMIUM_MONTHLY_IMPORTS;
       if (usage.importsMonth >= importLimit) {
+        storage.logEvent(userId, "ai_limit_reached", { kind: "imports", tier });
         return res.status(429).json({
           error: isPremium
             ? "You've reached this month's screenshot import limit — it resets on the 1st."
@@ -140,6 +141,7 @@ export async function aiRateLimit(req: Request, res: Response, next: NextFunctio
     const used = isTest ? usage.aiCallsToday : usage.aiCallsMonth;
     if (used >= limit) {
       // At the limit: reject up front. No charge — we return before hooking the response.
+      storage.logEvent(userId, "ai_limit_reached", { kind: "suggestions", tier });
       return res.status(429).json({
         error: isTest ? "Daily assistant limit reached"
           : isPremium ? "You've reached this month's fair-use limit — it resets on the 1st."
@@ -187,6 +189,7 @@ export async function copilotRateLimit(req: Request, res: Response, next: NextFu
     const copilotLimit = isTest ? COPILOT_TEST_TIER_DAILY_LIMIT : isPremium ? PREMIUM_MONTHLY_COPILOT : FREE_MONTHLY_COPILOT;
     const used = isTest ? usage.copilotCallsToday : usage.copilotCallsMonth;
     if (used >= copilotLimit) {
+      storage.logEvent(userId, "ai_limit_reached", { kind: "copilot", tier });
       return res.status(429).json({
         error: isTest ? "Daily Copilot chat limit reached"
           : isPremium ? "You've reached this month's fair-use limit — it resets on the 1st."

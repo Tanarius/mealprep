@@ -29,6 +29,7 @@ vi.mock("../storage", () => ({
     getGlobalAiCallsToday: vi.fn(),
     incrementGlobalAiCalls: vi.fn(),
     claimGlobalAiAlert: vi.fn(),
+    logEvent: vi.fn(async () => {}),
   },
 }));
 

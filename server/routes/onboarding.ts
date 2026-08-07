@@ -117,6 +117,7 @@ router.post("/complete", async (req, res, next) => {
   try {
     const userId = (req.user as any).id;
     await storage.completeOnboarding(userId);
+    storage.logEvent(userId, "onboarding_completed");
 
     // Derive and persist the taste profile from all swipes collected during onboarding
     const swipes = await storage.getOnboardingSwipes(userId);

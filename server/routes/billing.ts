@@ -70,6 +70,7 @@ router.post("/create-checkout", requireAuth, async (req: Request, res: Response)
       allow_promotion_codes: true,
     });
 
+    storage.logEvent(user.id, "checkout_started", { plan: plan === "annual" ? "annual" : "monthly" });
     res.json({ url: session.url });
   } catch (err: any) {
     if (err.status) return res.status(err.status).json({ error: err.message });
@@ -142,6 +143,7 @@ router.post("/webhook", async (req: Request, res: Response) => {
           storage.updateUserSubscriptionTier(user.id, "premium"),
           storage.setStripeSubscription(user.id, subscriptionId),
         ]);
+        storage.logEvent(user.id, "subscription_activated");
         console.log(`[billing] User ${user.id} upgraded to premium via checkout`);
         break;
       }

@@ -12,6 +12,8 @@ export default function PricingPage() {
 
   const handleUpgrade = async () => {
     setLoading(true);
+    // Funnel analytics — fire-and-forget, never blocks checkout
+    apiRequest("POST", "/api/events", { event: "upgrade_clicked", properties: { source: "pricing_page" } }).catch(() => {});
     try {
       const res = await apiRequest("POST", "/api/billing/create-checkout", { plan: "monthly" });
       const data = await res.json();
