@@ -1,4 +1,5 @@
 import { Router } from "express";
+import * as Sentry from "@sentry/node";
 import { aiRateLimit, copilotRateLimit } from "../middleware/aiRateLimit";
 import { authedUser } from "../middleware/requireAuth";
 import {
@@ -246,11 +247,12 @@ router.post("/copilot/save-recipe", copilotRateLimit, async (req, res, next) => 
     storage.logActivity(authedUser(req).id, "recipe_added", saved.id, saved.name);
     res.json({ success: true, recipe: saved });
 
-    // Fire-and-forget: nutrition + image fallback
+    // Fire-and-forget: nutrition + image fallback. Failures don't affect the response,
+    // but they must be VISIBLE — capture to Sentry instead of swallowing silently.
     const ingredientNames = ingredients.map(i => i.name);
     enrichWithNutrition(recipe.title, ingredientNames).then(nutrition => {
-      if (nutrition) storage.updateRecipeNutrition(saved.id, JSON.stringify(nutrition)).catch(() => {});
-    }).catch(() => {});
+      if (nutrition) storage.updateRecipeNutrition(saved.id, JSON.stringify(nutrition)).catch(err => Sentry.captureException(err));
+    }).catch(err => Sentry.captureException(err));
 
     if (!recipe.imageUrl) {
       const { CUISINE_EMOJI } = await import('../services/spoonacular');
@@ -259,9 +261,11 @@ router.post("/copilot/save-recipe", copilotRateLimit, async (req, res, next) => 
       searchRecipes({ searchText: recipe.title, cuisine: cuisineNorm, tags: [] }, { number: 1 })
         .then(results => {
           const imgUrl = results[0]?.imageUrl || emoji;
-          storage.updateRecipe(saved.id, authedUser(req).householdId, { imageUrl: imgUrl } as any).catch(() => {});
+          storage.updateRecipe(saved.id, authedUser(req).householdId, { imageUrl: imgUrl } as any).catch(err => Sentry.captureException(err));
         }).catch(() => {
-          storage.updateRecipe(saved.id, authedUser(req).householdId, { imageUrl: emoji } as any).catch(() => {});
+          // The search failing is expected fallback flow (emoji instead); only a failed
+          // WRITE is worth capturing.
+          storage.updateRecipe(saved.id, authedUser(req).householdId, { imageUrl: emoji } as any).catch(err => Sentry.captureException(err));
         });
     }
   } catch (err) {

@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
+import * as Sentry from "@sentry/node";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import aiRoutes from "./routes/ai";
@@ -256,7 +257,9 @@ export async function registerRoutes(server: Server, app: Express) {
           total += value.length;
           html += decoder.decode(value, { stream: true });
         }
-        await reader.cancel().catch(() => {});
+        // Cancel failure is inconsequential (we already have the bytes we need) —
+        // record a breadcrumb rather than an event.
+        await reader.cancel().catch(err => Sentry.addBreadcrumb({ category: "og-image", message: `reader.cancel failed: ${err?.message}`, level: "warning" }));
       }
 
       // Try multiple og:image patterns (property or name attribute order varies)
@@ -343,9 +346,10 @@ export async function registerRoutes(server: Server, app: Express) {
       let ingredientNames: string[] = [];
       try { ingredientNames = (JSON.parse(recipe.ingredients) as any[]).map(i => i.name).filter(Boolean); } catch { /* skip */ }
       if (ingredientNames.length > 0) {
+        // Failures don't affect the response but must be visible — capture, don't swallow.
         enrichWithNutrition(recipe.name, ingredientNames).then(nutrition => {
-          if (nutrition) storage.updateRecipeNutrition(recipe.id, JSON.stringify(nutrition)).catch(() => {});
-        }).catch(() => {});
+          if (nutrition) storage.updateRecipeNutrition(recipe.id, JSON.stringify(nutrition)).catch(err => Sentry.captureException(err));
+        }).catch(err => Sentry.captureException(err));
       }
     }
 
