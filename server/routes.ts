@@ -10,6 +10,7 @@ import { requireAuth, isSafeUrl, isPrivateAddress } from "./middleware/requireAu
 import { lookup } from "dns/promises";
 import { insertRecipeSchema, insertWeeklyPlanSchema, insertPantryStapleSchema, updateUserTasteProfileSchema, type InsertWeeklyPlan } from "@shared/schema";
 import { guessCategory, guessCuisine } from "./utils/categorization";
+import { checkHouseholdJoinCap, joinCapError, householdIsPremium, FREE_ACTIVITY_LIMIT, PREMIUM_ACTIVITY_LIMIT } from "./utils/householdLimit";
 import { detectTags } from "./utils/autoTag";
 import { buildShoppingList } from "./utils/shoppingList";
 import { enrichWithNutrition, extractRecipeByUrl, searchRecipeImage } from "./services/spoonacular";
@@ -490,6 +491,8 @@ export async function registerRoutes(server: Server, app: Express) {
     if (!code || !/^[A-Z0-9]{8,20}$/.test(code)) return res.status(400).json({ error: "Invalid invite code format" });
     const hh = await storage.getHouseholdByInviteCode(code);
     if (!hh) return res.status(404).json({ error: "Invalid invite code" });
+    const cap = await checkHouseholdJoinCap(hh.id);
+    if (!cap.allowed) return res.status(403).json(joinCapError(cap));
     await storage.setUserHousehold(user.id, hh.id);
     res.json(hh);
   });
@@ -533,7 +536,10 @@ export async function registerRoutes(server: Server, app: Express) {
       recipeNames: string[]; recipeIds: number[]; latestAt: string;
     }
     const householdId = (req.user as any).householdId;
-    const rows = await storage.getRecentActivity(householdId, 40);
+    // "Full activity feed history" is a Pro perk: premium households see 40 entries,
+    // free households the most recent 15.
+    const premium = await householdIsPremium(householdId);
+    const rows = await storage.getRecentActivity(householdId, premium ? PREMIUM_ACTIVITY_LIMIT : FREE_ACTIVITY_LIMIT);
     const groups: ActivityGroup[] = [];
     for (const row of rows) {
       const last = groups[groups.length - 1];

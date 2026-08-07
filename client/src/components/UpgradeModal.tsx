@@ -12,14 +12,13 @@ interface UpgradeModalProps {
   reason?: string; // e.g. "You've used your 10 free AI messages today."
 }
 
+// Every perk here is genuinely tier-differentiated — enforced server-side, not just copy.
 const PERKS = [
-  "500 recipe suggestions / month",
-  "1,000 assistant messages / month",
-  "One-click weekly plan generation",
-  "100 screenshot imports / month",
-  "Up to 6 household members",
+  "500 recipe suggestions / month (free: 30)",
+  "1,000 assistant messages / month (free: 100)",
+  "100 screenshot imports / month (free: 10)",
+  "Up to 6 household members (free: 2)",
   "Full activity feed history",
-  "Nutrition data on recipes",
 ];
 
 export function UpgradeModal({ open, onClose, reason }: UpgradeModalProps) {

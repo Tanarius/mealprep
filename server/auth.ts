@@ -9,6 +9,7 @@ import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { User } from "@shared/schema";
 import { generateInviteCode } from "./utils/invite";
+import { checkHouseholdJoinCap, joinCapError } from "./utils/householdLimit";
 import { sendPasswordResetEmail } from "./services/email";
 import crypto from "crypto";
 
@@ -157,6 +158,9 @@ export function setupAuth(app: Express) {
       if (rawCode) {
         const hh = await storage.getHouseholdByInviteCode(rawCode);
         if (!hh) return res.status(400).send("Invalid invite code");
+        // Same member cap as /api/household/join — registration must not be a side door
+        const cap = await checkHouseholdJoinCap(hh.id);
+        if (!cap.allowed) return res.status(403).json(joinCapError(cap));
         householdId = hh.id;
       } else {
         const code = generateInviteCode();

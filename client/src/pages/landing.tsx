@@ -167,7 +167,8 @@ export default function LandingPage() {
     "Meal planning & weekly planner",
     "Recipe library (unlimited)",
     "Shopping list generation",
-    "Household sharing",
+    "Nutrition data on recipes",
+    "Household sharing (2 members)",
     "30 suggestions / month",
     "100 assistant messages / month",
   ];
@@ -176,8 +177,9 @@ export default function LandingPage() {
     "Everything in Free",
     "500 suggestions / month",
     "1,000 assistant messages / month",
-    "Priority support",
-    "Early access to new features",
+    "100 screenshot imports / month",
+    "Up to 6 household members",
+    "Full activity feed history",
   ];
 
   const painPoints = [

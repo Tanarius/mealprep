@@ -65,10 +65,11 @@ export default function PricingPage() {
               {[
                 { label: "30 suggestions / month", icon: <Zap className="w-5 h-5 text-gray-400" /> },
                 { label: "100 assistant messages / month", icon: <MessageSquare className="w-5 h-5 text-gray-400" /> },
-                { label: "Shared household pantry", icon: <Utensils className="w-5 h-5 text-gray-400" /> },
+                { label: "Shared household pantry (2 members)", icon: <Utensils className="w-5 h-5 text-gray-400" /> },
                 { label: "Manual weekly planner", icon: <CalendarDays className="w-5 h-5 text-gray-400" /> },
                 { label: "Basic shopping list", icon: <ShoppingCart className="w-5 h-5 text-gray-400" /> },
                 { label: "Save unlimited recipes", icon: <Check className="w-5 h-5 text-gray-400" /> },
+                { label: "Nutrition data on recipes", icon: <Check className="w-5 h-5 text-gray-400" /> },
               ].map((feat, i) => (
                 <li key={i} className="flex items-center gap-3 text-gray-300">
                   {feat.icon}
@@ -103,10 +104,9 @@ export default function PricingPage() {
             <ul className="space-y-4 mb-8 flex-1">
               {[
                 { label: "500 suggestions & 1,000 assistant messages / month", icon: <Sparkles className="w-5 h-5 text-orange-400" /> },
-                { label: "Generate 1-click weekly plans", icon: <Sparkles className="w-5 h-5 text-orange-400" /> },
-                { label: "Auto-categorized groceries", icon: <Sparkles className="w-5 h-5 text-orange-400" /> },
-                { label: "Nutrition & macros data", icon: <Check className="w-5 h-5 text-orange-400" /> },
-                { label: "Priority recipe suggestions", icon: <Check className="w-5 h-5 text-orange-400" /> },
+                { label: "100 screenshot imports / month (free: 10)", icon: <Sparkles className="w-5 h-5 text-orange-400" /> },
+                { label: "Up to 6 household members (free: 2)", icon: <Check className="w-5 h-5 text-orange-400" /> },
+                { label: "Full activity feed history", icon: <Check className="w-5 h-5 text-orange-400" /> },
               ].map((feat, i) => (
                 <li key={i} className="flex items-center gap-3 text-white font-medium">
                   {feat.icon}

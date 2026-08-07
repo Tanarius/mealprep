@@ -77,7 +77,7 @@ export default function PrivacyPage() {
               <li>Delete your account and all associated data</li>
               <li>Export your recipe library (contact us)</li>
             </ul>
-            <p className="mt-3">To exercise these rights, use the account settings in the app or contact us at <a href="mailto:support@Simmer.app" className="text-primary hover:underline">support@Simmer.app</a>.</p>
+            <p className="mt-3">To exercise these rights, use the account settings in the app or contact us at <a href="mailto:hello@simmer.kitchen" className="text-primary hover:underline">hello@simmer.kitchen</a>.</p>
           </section>
 
           <section>
@@ -102,7 +102,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-lg font-semibold mb-3">13. Contact</h2>
-            <p>For privacy inquiries: <a href="mailto:support@Simmer.app" className="text-primary hover:underline">support@Simmer.app</a></p>
+            <p>For privacy inquiries: <a href="mailto:hello@simmer.kitchen" className="text-primary hover:underline">hello@simmer.kitchen</a></p>
           </section>
 
         </div>
