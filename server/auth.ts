@@ -29,10 +29,18 @@ const registerRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
-// Never send the password field to the client
-function safeUser(user: any) {
+// Never send the password field to the client.
+// Also normalize stale daily counters: the DB only zeroes aiCallsToday/copilotCallsToday
+// lazily on the next AI call (resetAiCallsIfNewDay in the rate-limit middlewares), so a
+// returning user's stored counts are yesterday's until then. Displaying them as-is shows
+// stale usage; report 0 whenever the stored reset date isn't today. Read-only — the real
+// reset still happens on the AI path.
+export function safeUser(user: any) {
   if (!user) return user;
   const { password: _pw, ...safe } = user;
+  const todayStr = new Date().toISOString().split("T")[0];
+  if (safe.aiCallsResetDate !== todayStr) safe.aiCallsToday = 0;
+  if (safe.copilotResetDate !== todayStr) safe.copilotCallsToday = 0;
   return safe;
 }
 
