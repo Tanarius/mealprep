@@ -1,9 +1,22 @@
 import { Request, Response, NextFunction } from "express";
+import type { User as AppUser } from "@shared/schema";
 
 /** Drop-in middleware — returns 401 if the request isn't authenticated. */
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
   next();
+}
+
+/**
+ * The authenticated user, with householdId narrowed to number. Every authenticated
+ * user has a household — registration assigns one and GET /api/household
+ * auto-repairs the legacy gap — but the DB column is nullable, so the schema type
+ * can't express that. This single documented assertion replaces the blanket
+ * `(req.user as any)` casts that used to hide the invariant. Only call it behind
+ * requireAuth (or an equivalent isAuthenticated() check).
+ */
+export function authedUser(req: Request): AppUser & { householdId: number } {
+  return req.user as AppUser & { householdId: number };
 }
 
 /**

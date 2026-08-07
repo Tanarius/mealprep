@@ -6,7 +6,7 @@ import aiRoutes from "./routes/ai";
 import onboardingRoutes from "./routes/onboarding";
 import billingRoutes from "./routes/billing";
 import snacksRoutes from "./routes/snacks";
-import { requireAuth, isSafeUrl, isPrivateAddress } from "./middleware/requireAuth";
+import { requireAuth, authedUser, isSafeUrl, isPrivateAddress } from "./middleware/requireAuth";
 import { lookup } from "dns/promises";
 import { insertRecipeSchema, insertWeeklyPlanSchema, insertPantryStapleSchema, updateUserTasteProfileSchema, type InsertWeeklyPlan } from "@shared/schema";
 import { guessCategory, guessCuisine } from "./utils/categorization";
@@ -302,7 +302,7 @@ export async function registerRoutes(server: Server, app: Express) {
 
   // === TASTE PROFILE ===
   app.get("/api/taste-profile", requireAuth, async (req, res) => {
-    const profile = await storage.getUserTasteProfile((req.user as any).id);
+    const profile = await storage.getUserTasteProfile(authedUser(req).id);
     res.json(profile || {});
   });
 
@@ -311,32 +311,32 @@ export async function registerRoutes(server: Server, app: Express) {
     if (!result.success) {
       return res.status(400).json({ error: "Invalid taste profile data", details: result.error.flatten() });
     }
-    await storage.upsertUserTasteProfile((req.user as any).id, result.data);
+    await storage.upsertUserTasteProfile(authedUser(req).id, result.data);
     res.json({ success: true });
   });
 
   // === RECIPES ===
   app.get("/api/recipes", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     if (!householdId) return res.json([]); // no household yet — return empty rather than crash
     const recipes = await storage.getRecipes(householdId);
     res.json(recipes);
   });
 
   app.get("/api/recipes/:id", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const recipe = await storage.getRecipe(Number(req.params.id), householdId);
     if (!recipe) return res.status(404).json({ error: "Recipe not found" });
     res.json(recipe);
   });
 
   app.post("/api/recipes", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const parsed = insertRecipeSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
     const recipe = await storage.createRecipe({ ...parsed.data, householdId });
     res.status(201).json(recipe);
-    storage.logActivity((req.user as any).id, "recipe_added", recipe.id, recipe.name);
+    storage.logActivity(authedUser(req).id, "recipe_added", recipe.id, recipe.name);
 
     // Fire-and-forget nutrition enrichment — don't block the response
     {
@@ -430,7 +430,7 @@ export async function registerRoutes(server: Server, app: Express) {
   });
 
   app.patch("/api/recipes/:id", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     // Validate against a partial of the insert schema. insertRecipeSchema already
     // omits id and householdId, so a malicious body cannot reassign a recipe to
     // another household or overwrite internal columns (mass-assignment guard).
@@ -443,15 +443,15 @@ export async function registerRoutes(server: Server, app: Express) {
 
   app.delete("/api/recipes/:id", requireAuth, async (req, res) => {
     const id = Number(req.params.id);
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const existing = await storage.getRecipe(id, householdId);
     await storage.deleteRecipe(id, householdId);
     res.status(204).send();
-    if (existing) storage.logActivity((req.user as any).id, "recipe_deleted", id, existing.name);
+    if (existing) storage.logActivity(authedUser(req).id, "recipe_deleted", id, existing.name);
   });
 
   app.post("/api/recipes/:id/favorite", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const recipe = await storage.toggleFavorite(Number(req.params.id), householdId);
     if (!recipe) return res.status(404).json({ error: "Recipe not found" });
     res.json(recipe);
@@ -470,7 +470,7 @@ export async function registerRoutes(server: Server, app: Express) {
   }
 
   app.get("/api/household", requireAuth, async (req, res) => {
-    const user = req.user as any;
+    const user = authedUser(req);
     let householdId = user.householdId;
     // Auto-assign: if user somehow has no household (migration gap), create one now
     if (!householdId) {
@@ -486,7 +486,7 @@ export async function registerRoutes(server: Server, app: Express) {
   });
 
   app.patch("/api/household/name", requireAuth, async (req, res) => {
-    const user = req.user as any;
+    const user = authedUser(req);
     if (!user.householdId) return res.status(404).json({ error: "No household" });
     const { name } = req.body;
     if (!name || typeof name !== "string" || !name.trim()) return res.status(400).json({ error: "Name required" });
@@ -497,7 +497,7 @@ export async function registerRoutes(server: Server, app: Express) {
   app.post("/api/household/join", requireAuth, async (req, res) => {
     const ip = (req.ip ?? req.socket.remoteAddress ?? "unknown");
     if (!checkJoinRate(ip)) return res.status(429).json({ error: "Too many attempts. Try again in a minute." });
-    const user = req.user as any;
+    const user = authedUser(req);
     const code = (req.body.inviteCode ?? "").trim().toUpperCase();
     if (!code || !/^[A-Z0-9]{8,20}$/.test(code)) return res.status(400).json({ error: "Invalid invite code format" });
     const hh = await storage.getHouseholdByInviteCode(code);
@@ -521,7 +521,7 @@ export async function registerRoutes(server: Server, app: Express) {
 
   // Regenerate invite code
   app.post("/api/household/regenerate", requireAuth, async (req, res) => {
-    const user = req.user as any;
+    const user = authedUser(req);
     if (!user.householdId) return res.status(404).json({ error: "No household" });
     const { generateInviteCode } = await import("./utils/invite");
     const newCode = generateInviteCode();
@@ -531,7 +531,7 @@ export async function registerRoutes(server: Server, app: Express) {
 
   // Leave household (creates a new solo home)
   app.post("/api/household/leave", requireAuth, async (req, res) => {
-    const user = req.user as any;
+    const user = authedUser(req);
     if (!user.householdId) return res.status(404).json({ error: "No household" });
     const { generateInviteCode } = await import("./utils/invite");
     const code = generateInviteCode();
@@ -546,7 +546,7 @@ export async function registerRoutes(server: Server, app: Express) {
       username: string; avatar: string | null; action: string; count: number;
       recipeNames: string[]; recipeIds: number[]; latestAt: string;
     }
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     // "Full activity feed history" is a Pro perk: premium households see 40 entries,
     // free households the most recent 15.
     const premium = await householdIsPremium(householdId);
@@ -577,20 +577,20 @@ export async function registerRoutes(server: Server, app: Express) {
 
   // === WEEKLY PLANS ===
   app.get("/api/plans", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const plans = await storage.getWeeklyPlans(householdId);
     res.json(plans);
   });
 
   app.get("/api/plans/:weekStart", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const plan = await storage.getWeeklyPlan(req.params.weekStart as string, householdId);
     if (!plan) return res.json({ weekStart: req.params.weekStart, meals: "{}" });
     res.json(plan);
   });
 
   app.post("/api/plans", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const parsed = insertWeeklyPlanSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
     const existing = await storage.getWeeklyPlan(parsed.data.weekStart, householdId);
@@ -598,10 +598,10 @@ export async function registerRoutes(server: Server, app: Express) {
     if (req.body.mealMeta !== undefined) (planData as any).mealMeta = req.body.mealMeta;
     const plan = await storage.upsertWeeklyPlan(planData);
     res.json(plan);
-    storage.logEvent((req.user as any).id, "week_planned", { weekStart: parsed.data.weekStart });
+    storage.logEvent(authedUser(req).id, "week_planned", { weekStart: parsed.data.weekStart });
     // Diff-based activity logging — log each newly added recipe
     if (existing?.meals !== parsed.data.meals) {
-      const userId = (req.user as any).id;
+      const userId = authedUser(req).id;
       const oldMeals: Record<string, any> = existing?.meals ? JSON.parse(existing.meals) : {};
       const newMeals: Record<string, any> = JSON.parse(parsed.data.meals);
       const oldVals = new Set(Object.values(oldMeals).map(String));
@@ -618,23 +618,23 @@ export async function registerRoutes(server: Server, app: Express) {
   });
 
   app.delete("/api/plans/:id", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     await storage.deleteWeeklyPlan(Number(req.params.id), householdId);
     res.status(204).send();
   });
 
   // === MEAL REACTIONS ===
   app.get("/api/plans/:weekStart/reactions", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const reactions = await storage.getReactionsForWeek(req.params.weekStart as string, householdId);
     res.json(reactions);
   });
 
   app.post("/api/plans/:weekStart/reactions", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const weekStart = req.params.weekStart as string;
     const { slotKey, emoji } = req.body;
-    const userId = (req.user as any).id;
+    const userId = authedUser(req).id;
     if (!slotKey) return res.status(400).json({ error: "slotKey required" });
     // Verify the week plan belongs to this household before accepting reactions
     const plan = await storage.getWeeklyPlan(weekStart, householdId);
@@ -649,22 +649,22 @@ export async function registerRoutes(server: Server, app: Express) {
 
   // === PANTRY STAPLES ===
   app.get("/api/staples", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const staples = await storage.getPantryStaples(householdId);
     res.json(staples);
   });
 
   app.post("/api/staples", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const parsed = insertPantryStapleSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
     const staple = await storage.createPantryStaple({ ...parsed.data, householdId });
     res.status(201).json(staple);
-    storage.logActivity((req.user as any).id, "pantry_added", null, staple.name);
+    storage.logActivity(authedUser(req).id, "pantry_added", null, staple.name);
   });
 
   app.delete("/api/staples/:id", requireAuth, async (req, res) => {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     await storage.deletePantryStaple(Number(req.params.id), householdId);
     res.status(204).send();
   });
@@ -1222,7 +1222,7 @@ ${pageText.substring(0, 6000)}`;
     if (!recipeIds || !Array.isArray(recipeIds)) {
       return res.status(400).json({ error: "recipeIds array required" });
     }
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const staples = await storage.getPantryStaples(householdId);
     const stapleNames = new Set(staples.map(s => s.name.toLowerCase()));
 
@@ -1241,7 +1241,7 @@ ${pageText.substring(0, 6000)}`;
 
     const { totalItems, categories } = buildShoppingList(allIngredients, stapleNames);
     res.json({ totalItems, recipeCount: recipeIds.length, categories });
-    storage.logEvent((req.user as any).id, "shopping_list_generated", { recipeCount: recipeIds.length, totalItems });
+    storage.logEvent(authedUser(req).id, "shopping_list_generated", { recipeCount: recipeIds.length, totalItems });
   });
 
   // === PRODUCT ANALYTICS ===
@@ -1255,7 +1255,7 @@ ${pageText.substring(0, 6000)}`;
       return res.status(400).json({ error: "Unknown event" });
     }
     const source = typeof properties?.source === "string" ? properties.source.slice(0, 40) : undefined;
-    await storage.logEvent((req.user as any).id, event, source ? { source } : undefined);
+    await storage.logEvent(authedUser(req).id, event, source ? { source } : undefined);
     res.json({ ok: true });
   });
 }

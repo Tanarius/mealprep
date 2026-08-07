@@ -23,6 +23,7 @@ vi.mock("../middleware/requireAuth", () => ({
     };
     next();
   },
+  authedUser: (req: any) => req.user,
 }));
 
 // No-op rate limiter — the real bulkRateLimit would 429 across the file's requests.

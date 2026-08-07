@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { aiRateLimit, copilotRateLimit } from "../middleware/aiRateLimit";
+import { authedUser } from "../middleware/requireAuth";
 import {
   suggestRecipesFromPantry,
   selectWeeklyMeals,
@@ -23,7 +24,7 @@ router.post("/copilot/chat", copilotRateLimit, async (req, res, next) => {
     const { sessionId, content } = req.body;
     if (!sessionId || !content) return res.status(400).json({ error: "Missing sessionId or content" });
 
-    const reply = await chatWithCopilot((req.user as any).id, (req.user as any).householdId, sessionId, content);
+    const reply = await chatWithCopilot(authedUser(req).id, authedUser(req).householdId, sessionId, content);
 
     res.json({ message: reply, callsRemaining: res.locals.copilotCallsRemaining });
   } catch (err) {
@@ -34,7 +35,7 @@ router.post("/copilot/chat", copilotRateLimit, async (req, res, next) => {
 router.get("/copilot/history/:sessionId", async (req, res, next) => {
   try {
     const { sessionId } = req.params;
-    const history = await storage.getCopilotHistory((req.user as any).id, sessionId);
+    const history = await storage.getCopilotHistory(authedUser(req).id, sessionId);
     // Return chronologically
     res.json(history.reverse());
   } catch (err) {
@@ -46,7 +47,7 @@ router.post("/copilot/execute-tool", copilotRateLimit, async (req, res, next) =>
   try {
     const { sessionId, messageId, action, status } = req.body; // status: 'applied' | 'dismissed'
     
-    await storage.updateProposedActionStatus((req.user as any).id, sessionId, messageId, status);
+    await storage.updateProposedActionStatus(authedUser(req).id, sessionId, messageId, status);
     
     if (status === 'applied') {
       const p = action.parameters;
@@ -98,7 +99,7 @@ router.post("/copilot/execute-tool", copilotRateLimit, async (req, res, next) =>
           if (p.servingSuggestion) tips.push(`Serving: ${p.servingSuggestion}`);
 
           const recipe = await storage.createRecipe({
-            householdId: (req.user as any).householdId,
+            householdId: authedUser(req).householdId,
             name: p.name,
             cuisine: p.cuisine || 'other',
             ingredients: JSON.stringify(structuredIngredients),
@@ -115,12 +116,12 @@ router.post("/copilot/execute-tool", copilotRateLimit, async (req, res, next) =>
             tips,
             isProcessed: true,
           } as any);
-          storage.logActivity((req.user as any).id, "recipe_added", recipe.id, recipe.name);
+          storage.logActivity(authedUser(req).id, "recipe_added", recipe.id, recipe.name);
           return res.json({ success: true, message: "Recipe saved to library!", recipeId: recipe.id });
         }
 
         case 'add_to_weekly_plan':
-          const householdIdForPlan = (req.user as any).householdId;
+          const householdIdForPlan = authedUser(req).householdId;
           const weekPlan = await storage.getWeeklyPlan(p.weekStart, householdIdForPlan);
           let meals = weekPlan ? JSON.parse(weekPlan.meals) : {};
           // Use recipeId (number) so shopping list and recipe cards work correctly
@@ -151,8 +152,8 @@ router.post("/copilot/execute-tool", copilotRateLimit, async (req, res, next) =>
             return { name: raw.trim(), source: 'copilot' as const };
           });
           await storage.bulkAddShoppingItems(
-            (req.user as any).householdId,
-            (req.user as any).id,
+            authedUser(req).householdId,
+            authedUser(req).id,
             parsed
           );
           return res.json({ success: true, message: `Added ${parsed.length} item${parsed.length === 1 ? '' : 's'} to your shopping list.` });
@@ -170,7 +171,7 @@ router.post("/copilot/execute-tool", copilotRateLimit, async (req, res, next) =>
 router.post("/copilot/find-recipes", copilotRateLimit, async (req, res, next) => {
   try {
     const { query, cuisineChoice, mealType, maxReadyTime, diet, method } = req.body;
-    const userId = (req.user as any).id;
+    const userId = authedUser(req).id;
 
     // Build ParsedQuery from text (if present) then overlay explicit chip selections.
     // ALL paths go through searchRecipes — cuisine is NEVER dropped in that function.
@@ -225,7 +226,7 @@ router.post("/copilot/save-recipe", copilotRateLimit, async (req, res, next) => 
     const autoTags = detectTags(recipe.title, recipe.readyInMinutes, recipe.diets || []);
 
     const saved = await storage.createRecipe({
-      householdId: (req.user as any).householdId,
+      householdId: authedUser(req).householdId,
       name: recipe.title,
       cuisine: cuisineNorm,
       mealType,
@@ -242,7 +243,7 @@ router.post("/copilot/save-recipe", copilotRateLimit, async (req, res, next) => 
       isProcessed: true,
     } as any);
 
-    storage.logActivity((req.user as any).id, "recipe_added", saved.id, saved.name);
+    storage.logActivity(authedUser(req).id, "recipe_added", saved.id, saved.name);
     res.json({ success: true, recipe: saved });
 
     // Fire-and-forget: nutrition + image fallback
@@ -258,9 +259,9 @@ router.post("/copilot/save-recipe", copilotRateLimit, async (req, res, next) => 
       searchRecipes({ searchText: recipe.title, cuisine: cuisineNorm, tags: [] }, { number: 1 })
         .then(results => {
           const imgUrl = results[0]?.imageUrl || emoji;
-          storage.updateRecipe(saved.id, (req.user as any).householdId, { imageUrl: imgUrl } as any).catch(() => {});
+          storage.updateRecipe(saved.id, authedUser(req).householdId, { imageUrl: imgUrl } as any).catch(() => {});
         }).catch(() => {
-          storage.updateRecipe(saved.id, (req.user as any).householdId, { imageUrl: emoji } as any).catch(() => {});
+          storage.updateRecipe(saved.id, authedUser(req).householdId, { imageUrl: emoji } as any).catch(() => {});
         });
     }
   } catch (err) {
@@ -276,7 +277,7 @@ router.use(aiRateLimit);
 router.post("/clean-recipe/:id", async (req, res, next) => {
   try {
     const recipeId = parseInt(req.params.id);
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const dbRecipe = await storage.getRecipe(recipeId, householdId);
     if (!dbRecipe) return res.status(404).json({ error: "Recipe not found" });
 
@@ -317,7 +318,7 @@ router.post("/clean-recipe/:id", async (req, res, next) => {
 router.post("/suggest", async (req, res, next) => {
   try {
     const { ingredients, preferences } = req.body;
-    const userId = (req.user as any).id;
+    const userId = authedUser(req).id;
 
     // Build structured prefs — handle both string mood ("quick meal") and object
     let prefs: any;
@@ -351,7 +352,7 @@ router.post("/suggest", async (req, res, next) => {
     // Fall back to pantry staples when no ingredients supplied
     let ingredientList: string[] = ingredients && ingredients.length > 0 ? ingredients : [];
     if (ingredientList.length === 0) {
-      const staples = await storage.getPantryStaples((req.user as any).householdId);
+      const staples = await storage.getPantryStaples(authedUser(req).householdId);
       ingredientList = staples.map(s => s.name);
     }
 
@@ -377,8 +378,8 @@ router.post("/suggest", async (req, res, next) => {
 router.post("/weekly-plan", async (req, res, next) => {
   try {
     const { schedule } = req.body;
-    const userId = (req.user as any).id;
-    const householdId = (req.user as any).householdId;
+    const userId = authedUser(req).id;
+    const householdId = authedUser(req).householdId;
 
     const [recipes, recentMealNames, userPrefs] = await Promise.all([
       storage.getRecipes(householdId),
@@ -428,7 +429,7 @@ router.post("/weekly-plan", async (req, res, next) => {
 router.post("/optimize-shopping-list", async (req, res, next) => {
   try {
     const { listItems } = req.body; 
-    const staples = await storage.getPantryStaples((req.user as any).householdId);
+    const staples = await storage.getPantryStaples(authedUser(req).householdId);
     const pantryItems = staples.map(s => s.name);
 
     const optimizedList = await optimizeShoppingList(listItems || [], pantryItems);
@@ -441,7 +442,7 @@ router.post("/optimize-shopping-list", async (req, res, next) => {
 router.post("/tag-recipe", async (req, res, next) => {
   try {
     const { recipeId } = req.body;
-    const recipe = await storage.getRecipe(recipeId, (req.user as any).householdId);
+    const recipe = await storage.getRecipe(recipeId, authedUser(req).householdId);
     if (!recipe) return res.status(404).json({ error: "Recipe not found" });
 
     try {
@@ -450,7 +451,7 @@ router.post("/tag-recipe", async (req, res, next) => {
 
       const tags = await autoTagRecipe(recipe.name, parsedIngredients, stepStrings);
 
-      await storage.updateRecipe(recipeId, (req.user as any).householdId, {
+      await storage.updateRecipe(recipeId, authedUser(req).householdId, {
         tags: JSON.stringify(tags.dietaryFlags || []),
         difficulty: tags.difficulty || 'medium',
         prepTime: tags.prepTime || 15,

@@ -9,6 +9,7 @@ import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { User } from "@shared/schema";
 import { generateInviteCode } from "./utils/invite";
+import { authedUser } from "./middleware/requireAuth";
 import { checkHouseholdJoinCap, joinCapError } from "./utils/householdLimit";
 import { sendPasswordResetEmail } from "./services/email";
 import crypto from "crypto";
@@ -202,7 +203,7 @@ export function setupAuth(app: Express) {
       const { currentPassword, newPassword } = req.body;
       if (!currentPassword || !newPassword || newPassword.length < 6)
         return res.status(400).json({ error: "New password must be at least 6 characters" });
-      const user = await storage.getUser((req.user as any).id);
+      const user = await storage.getUser(authedUser(req).id);
       if (!user) return res.status(404).json({ error: "User not found" });
       if (!user.password?.startsWith('$2b$') && !user.password?.startsWith('$2a$')) {
         // Account predates bcrypt migration — user must log out and back in to upgrade first
@@ -282,7 +283,7 @@ export function setupAuth(app: Express) {
       ]);
       if (!avatar || typeof avatar !== "string" || !VALID_AVATAR_STYLES.has(avatar))
         return res.status(400).json({ error: "Invalid avatar" });
-      await storage.setUserAvatar((req.user as any).id, avatar);
+      await storage.setUserAvatar(authedUser(req).id, avatar);
       res.json({ success: true });
     } catch (err) { next(err); }
   });
@@ -295,7 +296,7 @@ export function setupAuth(app: Express) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
       if (!email || !emailRegex.test(email))
         return res.status(400).json({ error: "Valid email required" });
-      await storage.setUserEmail((req.user as any).id, email);
+      await storage.setUserEmail(authedUser(req).id, email);
       res.json({ success: true });
     } catch (err: any) {
       if (err.code === "23505") return res.status(400).json({ error: "Email already in use" });
@@ -306,7 +307,7 @@ export function setupAuth(app: Express) {
   app.delete("/api/auth/account", async (req, res, next) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
     try {
-      const user = req.user as any;
+      const user = authedUser(req);
       const { password } = req.body;
 
       // Require password confirmation

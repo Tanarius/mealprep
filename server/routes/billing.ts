@@ -35,7 +35,7 @@ function clientOrigin(): string {
 router.post("/create-checkout", requireAuth, async (req: Request, res: Response) => {
   try {
     const stripe = getStripe();
-    const user = req.user as any;
+    const user = req.user!;
     const { plan } = req.body; // "monthly" | "annual"
 
     const priceId = plan === "annual"
@@ -83,7 +83,7 @@ router.post("/create-checkout", requireAuth, async (req: Request, res: Response)
 router.post("/portal", requireAuth, async (req: Request, res: Response) => {
   try {
     const stripe = getStripe();
-    const user = req.user as any;
+    const user = req.user!;
 
     if (!user.stripeCustomerId) {
       return res.status(400).json({ error: "No active subscription found" });

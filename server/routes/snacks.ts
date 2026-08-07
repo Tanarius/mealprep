@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { requireAuth } from "../middleware/requireAuth";
+import { requireAuth, authedUser } from "../middleware/requireAuth";
 import { storage } from "../storage";
 import { guessCategory } from "../utils/categorization";
 import { dedupeShoppingItems } from "../utils/dedupeShoppingItems";
@@ -181,7 +181,7 @@ router.get("/products/search", requireAuth, searchRateLimit, async (req, res, ne
 
 router.get("/wishlist", requireAuth, async (req, res, next) => {
   try {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const items = await storage.getSnackWishlist(householdId);
     res.json(items);
   } catch (err) { next(err); }
@@ -191,8 +191,8 @@ router.post("/wishlist", requireAuth, async (req, res, next) => {
   try {
     const { name, brand, notes, imageUrl, productData } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: "Name required" });
-    const householdId = (req.user as any).householdId;
-    const userId = (req.user as any).id;
+    const householdId = authedUser(req).householdId;
+    const userId = authedUser(req).id;
     const item = await storage.addSnackWishlistItem(householdId, userId, {
       name: name.trim(), brand, notes, imageUrl, productData,
     });
@@ -202,7 +202,7 @@ router.post("/wishlist", requireAuth, async (req, res, next) => {
 
 router.delete("/wishlist/:id", requireAuth, async (req, res, next) => {
   try {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     await storage.deleteSnackWishlistItem(Number(req.params.id), householdId);
     res.json({ success: true });
   } catch (err) { next(err); }
@@ -211,8 +211,8 @@ router.delete("/wishlist/:id", requireAuth, async (req, res, next) => {
 // Move wishlist item → shopping list
 router.post("/wishlist/:id/add-to-shopping", requireAuth, async (req, res, next) => {
   try {
-    const householdId = (req.user as any).householdId;
-    const userId = (req.user as any).id;
+    const householdId = authedUser(req).householdId;
+    const userId = authedUser(req).id;
     const wishlist = await storage.getSnackWishlist(householdId);
     const item = wishlist.find(w => w.id === Number(req.params.id));
     if (!item) return res.status(404).json({ error: "Item not found" });
@@ -231,7 +231,7 @@ router.post("/wishlist/:id/add-to-shopping", requireAuth, async (req, res, next)
 
 router.get("/shopping", requireAuth, async (req, res, next) => {
   try {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const items = await storage.getShoppingList(householdId);
     res.json(items);
   } catch (err) { next(err); }
@@ -239,8 +239,8 @@ router.get("/shopping", requireAuth, async (req, res, next) => {
 
 router.post("/shopping", requireAuth, async (req, res, next) => {
   try {
-    const householdId = (req.user as any).householdId;
-    const userId = (req.user as any).id;
+    const householdId = authedUser(req).householdId;
+    const userId = authedUser(req).id;
     const { name, amount, unit, category, source, sourceId, productData } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: "Name required" });
     const cat = category ?? guessCategory(name);
@@ -254,8 +254,8 @@ router.post("/shopping", requireAuth, async (req, res, next) => {
 // Bulk-add items (from recipe generation)
 router.post("/shopping/bulk", requireAuth, bulkRateLimit, async (req, res, next) => {
   try {
-    const householdId = (req.user as any).householdId;
-    const userId = (req.user as any).id;
+    const householdId = authedUser(req).householdId;
+    const userId = authedUser(req).id;
     const { items } = req.body as { items: { name: string; amount?: string; unit?: string; category?: string; source?: string; sourceId?: number }[] };
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: "items array required" });
     if (items.length > 50) return res.status(400).json({ error: "Cannot add more than 50 items at once" });
@@ -279,8 +279,8 @@ const syncRecipeItemsSchema = z.object({ items: z.array(syncItemSchema).max(300)
 
 router.post("/shopping/sync-recipe-items", requireAuth, bulkRateLimit, async (req, res, next) => {
   try {
-    const householdId = (req.user as any).householdId;
-    const userId = (req.user as any).id;
+    const householdId = authedUser(req).householdId;
+    const userId = authedUser(req).id;
     const parsed = syncRecipeItemsSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
     const enriched = dedupeShoppingItems(
@@ -299,8 +299,8 @@ router.post("/shopping/sync-recipe-items", requireAuth, bulkRateLimit, async (re
 
 router.patch("/shopping/:id", requireAuth, async (req, res, next) => {
   try {
-    const householdId = (req.user as any).householdId;
-    const userId = (req.user as any).id;
+    const householdId = authedUser(req).householdId;
+    const userId = authedUser(req).id;
     const { checked } = req.body;
     if (typeof checked !== "boolean") return res.status(400).json({ error: "checked boolean required" });
     const item = await storage.toggleShoppingItem(Number(req.params.id), householdId, userId, checked);
@@ -311,14 +311,14 @@ router.patch("/shopping/:id", requireAuth, async (req, res, next) => {
 
 router.delete("/shopping/:id", requireAuth, async (req, res, next) => {
   try {
-    await storage.deleteShoppingItem(Number(req.params.id), (req.user as any).householdId);
+    await storage.deleteShoppingItem(Number(req.params.id), authedUser(req).householdId);
     res.json({ success: true });
   } catch (err) { next(err); }
 });
 
 router.delete("/shopping", requireAuth, async (req, res, next) => {
   try {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const { checked, source } = req.query;
     if (checked === "true") {
       await storage.clearCheckedShoppingItems(householdId);
@@ -334,7 +334,7 @@ router.delete("/shopping", requireAuth, async (req, res, next) => {
 // Attach product data to a shopping item (after user picks a product match)
 router.patch("/shopping/:id/product", requireAuth, async (req, res, next) => {
   try {
-    const householdId = (req.user as any).householdId;
+    const householdId = authedUser(req).householdId;
     const { productData, imageUrl } = req.body;
     if (!productData) return res.status(400).json({ error: "productData required" });
     await storage.updateShoppingItemProduct(Number(req.params.id), householdId, productData, imageUrl);

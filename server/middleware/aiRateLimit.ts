@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as Sentry from "@sentry/node";
 import { storage } from "../storage";
-import { User } from "@shared/schema";
 
 // ── Tier limits ──────────────────────────────────────────────────────────────
 // Free and premium are bounded on a MONTHLY window (calendar month, UTC). Premium's
@@ -32,13 +31,7 @@ export const COPILOT_TEST_TIER_DAILY_LIMIT = 200;
 export const ONBOARDING_DISH_LIMIT = 10;
 // applies to: /api/onboarding/dishes only
 
-declare global {
-  namespace Express {
-    // eslint-disable-next-line @typescript-eslint/no-empty-interface
-    interface User extends User_ {}
-  }
-}
-type User_ = import("@shared/schema").User;
+// The Express.User augmentation lives in server/types/express.d.ts.
 
 // ── Global daily circuit breaker ─────────────────────────────────────────────
 // Aggregate ceiling on AI calls across ALL users, counted in units (a Haiku-backed
@@ -96,11 +89,11 @@ function chargeOnSuccess(res: Response, hookedFlag: string, charge: () => Promis
 
 export async function aiRateLimit(req: Request, res: Response, next: NextFunction) {
   try {
-    if (!req.isAuthenticated() || !req.user || !(req.user as any).id) {
+    if (!req.isAuthenticated() || !req.user || !req.user!.id) {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    const userId = (req.user as any).id;
+    const userId = req.user!.id;
 
     // Global breaker first — a tripped breaker short-circuits before any per-user queries.
     if (await globalBreakerTripped(res)) return;
@@ -168,11 +161,11 @@ export async function aiRateLimit(req: Request, res: Response, next: NextFunctio
 
 export async function copilotRateLimit(req: Request, res: Response, next: NextFunction) {
   try {
-    if (!req.isAuthenticated() || !req.user || !(req.user as any).id) {
+    if (!req.isAuthenticated() || !req.user || !req.user!.id) {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    const userId = (req.user as any).id;
+    const userId = req.user!.id;
 
     // Global breaker first — a tripped breaker short-circuits before any per-user queries.
     if (await globalBreakerTripped(res)) return;

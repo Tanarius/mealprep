@@ -6,7 +6,7 @@ const router = Router();
 
 router.get("/state", async (req, res, next) => {
   try {
-    const state = await storage.getOnboardingState((req.user as any).id);
+    const state = await storage.getOnboardingState(req.user!.id);
     res.json(state || { completed: false, currentStep: 1 });
   } catch (err) {
     next(err);
@@ -15,9 +15,9 @@ router.get("/state", async (req, res, next) => {
 
 router.post("/start", async (req, res, next) => {
   try {
-    let state = await storage.getOnboardingState((req.user as any).id);
+    let state = await storage.getOnboardingState(req.user!.id);
     if (!state) {
-      state = await storage.createOnboardingState((req.user as any).id);
+      state = await storage.createOnboardingState(req.user!.id);
     }
     res.json(state);
   } catch (err) {
@@ -28,11 +28,11 @@ router.post("/start", async (req, res, next) => {
 router.post("/mode", async (req, res, next) => {
   try {
     const { cookingMode } = req.body;
-    let state = await storage.getOnboardingState((req.user as any).id);
+    let state = await storage.getOnboardingState(req.user!.id);
     if (!state) {
-      await storage.createOnboardingState((req.user as any).id);
+      await storage.createOnboardingState(req.user!.id);
     }
-    await storage.setOnboardingMode((req.user as any).id, cookingMode);
+    await storage.setOnboardingMode(req.user!.id, cookingMode);
     res.json({ success: true });
   } catch (err) {
     next(err);
@@ -63,11 +63,11 @@ router.get("/dishes", async (req, res, next) => {
 router.post("/swipe", async (req, res, next) => {
   try {
     const { dishName, cuisineType, complexity, mealType, liked, imageUrl } = req.body;
-    await storage.saveOnboardingSwipe((req.user as any).id, { dishName, cuisineType, complexity, mealType, liked, imageUrl });
+    await storage.saveOnboardingSwipe(req.user!.id, { dishName, cuisineType, complexity, mealType, liked, imageUrl });
     
     // Update the taste profile incrementally
     if (liked) {
-      await storage.incrementCuisineSignal((req.user as any).id, cuisineType);
+      await storage.incrementCuisineSignal(req.user!.id, cuisineType);
     }
     
     res.json({ success: true });
@@ -79,7 +79,7 @@ router.post("/swipe", async (req, res, next) => {
 // New onboarding v2 — saves all preferences in one shot
 router.post("/preferences", async (req, res, next) => {
   try {
-    const userId = (req.user as any).id;
+    const userId = req.user!.id;
     const { householdSize, cookingStyles, cuisines, dietary } = req.body;
 
     // Ensure onboarding record exists
@@ -115,7 +115,7 @@ router.post("/preferences", async (req, res, next) => {
 
 router.post("/complete", async (req, res, next) => {
   try {
-    const userId = (req.user as any).id;
+    const userId = req.user!.id;
     await storage.completeOnboarding(userId);
     storage.logEvent(userId, "onboarding_completed");
 
