@@ -21,6 +21,10 @@ vi.mock("../storage", () => ({
     incrementAiCalls: vi.fn(),
     resetCopilotCallsIfNewDay: vi.fn(),
     incrementCopilotCalls: vi.fn(),
+    // Global breaker (tested in global-breaker.test.ts) — benign defaults here
+    getGlobalAiCallsToday: vi.fn(),
+    incrementGlobalAiCalls: vi.fn(),
+    claimGlobalAiAlert: vi.fn(),
   },
 }));
 
@@ -70,6 +74,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   s.incrementAiCalls.mockResolvedValue({ newCount: 1 });
   s.incrementCopilotCalls.mockResolvedValue({ newCount: 1 });
+  s.getGlobalAiCallsToday.mockResolvedValue(0);
+  s.incrementGlobalAiCalls.mockResolvedValue(undefined);
+  s.claimGlobalAiAlert.mockResolvedValue(false);
 });
 
 // ─── aiRateLimit ──────────────────────────────────────────────────────────────

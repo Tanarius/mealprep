@@ -54,6 +54,9 @@ export interface IStorage {
   incrementCopilotCalls(userId: number): Promise<{ newCount: number }>;
   resetAiCallsIfNewDay(userId: number): Promise<void>;
   resetCopilotCallsIfNewDay(userId: number): Promise<void>;
+  getGlobalAiCallsToday(): Promise<number>;
+  incrementGlobalAiCalls(units: number): Promise<void>;
+  claimGlobalAiAlert(kind: "soft" | "hard"): Promise<boolean>;
   updateUserSubscriptionTier(userId: number, tier: string): Promise<void>;
   setStripeCustomer(userId: number, customerId: string): Promise<void>;
   setStripeSubscription(userId: number, subscriptionId: string | null): Promise<void>;
@@ -195,6 +198,18 @@ export class DatabaseStorage implements IStorage {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS meal_reactions_week_idx ON meal_reactions(week_start)`);
 
+    // Global AI usage — single-row counter behind the daily spend circuit breaker
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS global_ai_usage (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        calls_today INTEGER NOT NULL DEFAULT 0,
+        reset_date TEXT,
+        soft_alerted_date TEXT,
+        hard_alerted_date TEXT
+      )
+    `);
+    await pool.query(`INSERT INTO global_ai_usage (id) VALUES (1) ON CONFLICT DO NOTHING`);
+
     // Performance indexes
     await pool.query(`CREATE INDEX IF NOT EXISTS onboarding_swipes_user_idx ON onboarding_swipes(user_id, created_at DESC)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS copilot_sessions_user_session_idx ON copilot_sessions(user_id, session_id, timestamp DESC)`);
@@ -334,6 +349,47 @@ export class DatabaseStorage implements IStorage {
     if (user.copilotResetDate !== todayStr) {
       await db.update(users).set({ copilotCallsToday: 0, copilotResetDate: todayStr }).where(eq(users.id, userId));
     }
+  }
+
+  // ── Global AI usage (daily spend circuit breaker) ──────────────────────────
+  // Single-row table (id = 1). Same date-string reset semantics as the per-user
+  // helpers, but folded into one atomic upsert per operation so the new-day reset
+  // and the read/increment can't interleave under concurrency.
+
+  async getGlobalAiCallsToday(): Promise<number> {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const { rows } = await pool.query(
+      `INSERT INTO global_ai_usage (id, calls_today, reset_date) VALUES (1, 0, $1)
+       ON CONFLICT (id) DO UPDATE SET
+         calls_today = CASE WHEN global_ai_usage.reset_date IS DISTINCT FROM $1 THEN 0 ELSE global_ai_usage.calls_today END,
+         reset_date = $1
+       RETURNING calls_today`,
+      [todayStr]
+    );
+    return rows[0].calls_today;
+  }
+
+  async incrementGlobalAiCalls(units: number): Promise<void> {
+    const todayStr = new Date().toISOString().split('T')[0];
+    await pool.query(
+      `INSERT INTO global_ai_usage (id, calls_today, reset_date) VALUES (1, $2, $1)
+       ON CONFLICT (id) DO UPDATE SET
+         calls_today = CASE WHEN global_ai_usage.reset_date IS DISTINCT FROM $1 THEN $2 ELSE global_ai_usage.calls_today + $2 END,
+         reset_date = $1`,
+      [todayStr, units]
+    );
+  }
+
+  // Atomically claims today's soft/hard alert: true for exactly one caller per day,
+  // so warnings and Sentry captures fire once instead of per request.
+  async claimGlobalAiAlert(kind: "soft" | "hard"): Promise<boolean> {
+    const col = kind === "hard" ? "hard_alerted_date" : "soft_alerted_date";
+    const todayStr = new Date().toISOString().split('T')[0];
+    const result = await pool.query(
+      `UPDATE global_ai_usage SET ${col} = $1 WHERE id = 1 AND ${col} IS DISTINCT FROM $1`,
+      [todayStr]
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   async updateUserSubscriptionTier(userId: number, tier: string): Promise<void> {

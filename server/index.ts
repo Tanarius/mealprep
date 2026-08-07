@@ -39,6 +39,13 @@ if (process.env.NODE_ENV === "production") {
       console.warn(`WARN: ${key} is not set — Stripe billing will not work`);
     }
   }
+  // Soft warn-list, like billing: missing values never block boot — the global AI
+  // circuit breaker falls back to its built-in defaults (see middleware/aiRateLimit.ts).
+  for (const key of ["AI_DAILY_SOFT_LIMIT", "AI_DAILY_HARD_LIMIT"]) {
+    if (!process.env[key]) {
+      console.warn(`WARN: ${key} is not set — using the built-in default for the global AI breaker`);
+    }
+  }
 }
 
 const app = express();
