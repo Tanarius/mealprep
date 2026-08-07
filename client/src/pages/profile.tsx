@@ -216,7 +216,7 @@ export default function ProfilePage() {
   // Detect ?upgraded=true after Stripe Checkout redirect
   useEffect(() => {
     if (window.location.hash.includes("upgraded=true")) {
-      toast({ title: "Welcome to Premium!", description: "Your household now has unlimited assistant access." });
+      toast({ title: "Welcome to Premium!", description: "Your household now has the full Premium allowance." });
       // Clean the URL
       window.history.replaceState(null, "", window.location.pathname + "#/profile");
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });

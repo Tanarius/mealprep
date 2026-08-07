@@ -617,7 +617,7 @@ export default function ShoppingPage() {
         {copilotError && (
           <p className="text-xs text-red-400 mb-1.5 px-1">{copilotError}</p>
         )}
-        {copilotRemaining !== null && copilotRemaining < 9999 && (
+        {copilotRemaining !== null && (
           <p className="text-[11px] text-muted-foreground mb-1.5 px-1 tabular-nums">
             {copilotRemaining} {copilotRemaining === 1 ? "message" : "messages"} left today
           </p>

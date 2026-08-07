@@ -3,17 +3,31 @@ import * as Sentry from "@sentry/node";
 import { storage } from "../storage";
 import { User } from "@shared/schema";
 
-export const FREE_TIER_DAILY_LIMIT = 10;
-// applies to: /api/ai/suggest, /api/ai/weekly-plan, /api/ai/optimize-shopping-list, /api/ai/clean-recipe/:id
+// ── Tier limits ──────────────────────────────────────────────────────────────
+// Free and premium are bounded on a MONTHLY window (calendar month, UTC). Premium's
+// caps are deliberately high — essentially no genuine household will hit them — but
+// finite: "unlimited" was an unbounded promise with real per-call cost behind it.
+// Test accounts keep a generous DAILY window (internal QA use only).
+
+export const FREE_MONTHLY_SUGGESTIONS = 30;
+export const PREMIUM_MONTHLY_SUGGESTIONS = 500;
+// applies to: /api/ai/suggest, /api/ai/weekly-plan, /api/ai/optimize-shopping-list,
+//             /api/ai/clean-recipe/:id, and TEXT-mode social imports (Haiku-cheap)
+
+export const FREE_MONTHLY_COPILOT = 100;
+export const PREMIUM_MONTHLY_COPILOT = 1000;
+// applies to: /api/ai/copilot/* only
+
+export const FREE_MONTHLY_IMPORTS = 10;
+export const PREMIUM_MONTHLY_IMPORTS = 100;
+// applies to: /api/ai/import-from-social with mode === "image" ONLY — the Sonnet+vision
+// path costs ~an order of magnitude more per call than the Haiku paths, so it gets its
+// own tighter cap. Text-caption imports draw from the suggestions quota instead.
 
 export const TEST_TIER_DAILY_LIMIT = 200;
-// applies to: test accounts (subscriptionTier = 'test')
-
-export const COPILOT_FREE_TIER_DAILY_LIMIT = 30;
-// applies to: /api/ai/copilot/chat only
-
 export const COPILOT_TEST_TIER_DAILY_LIMIT = 200;
-// applies to: test accounts copilot calls
+// applies to: test accounts (subscriptionTier = 'test'); daily window, exempt from
+// monthly caps. Test accounts use the premium-sized import cap.
 
 export const ONBOARDING_DISH_LIMIT = 10;
 // applies to: /api/onboarding/dishes only
@@ -25,9 +39,6 @@ declare global {
   }
 }
 type User_ = import("@shared/schema").User;
-
-// Premium sentinel returned to the client for callsRemaining (matches routes/ai.ts).
-export const UNLIMITED = 9999;
 
 // ── Global daily circuit breaker ─────────────────────────────────────────────
 // Aggregate ceiling on AI calls across ALL users, counted in units (a Haiku-backed
@@ -92,28 +103,56 @@ export async function aiRateLimit(req: Request, res: Response, next: NextFunctio
     if (await globalBreakerTripped(res)) return;
 
     await storage.resetAiCallsIfNewDay(userId);
+    await storage.resetMonthlyCountersIfNewMonth(userId);
     const usage = await storage.getUserAiUsage(userId);
 
-    const isPremium = usage.subscriptionTier === 'premium';
-    const limit = usage.subscriptionTier === 'test' ? TEST_TIER_DAILY_LIMIT : FREE_TIER_DAILY_LIMIT;
-    if (!isPremium && usage.aiCallsToday >= limit) {
+    const tier = usage.subscriptionTier;
+    const isPremium = tier === 'premium';
+    const isTest = tier === 'test';
+
+    // Image-mode social import → the dedicated (tighter) monthly import cap. This is the
+    // Sonnet+vision path; it never draws from the suggestions quota, and vice versa.
+    if ((req.body as any)?.mode === "image") {
+      const importLimit = tier === 'free' ? FREE_MONTHLY_IMPORTS : PREMIUM_MONTHLY_IMPORTS;
+      if (usage.importsMonth >= importLimit) {
+        return res.status(429).json({
+          error: isPremium
+            ? "You've reached this month's screenshot import limit — it resets on the 1st."
+            : "Monthly screenshot import limit reached",
+          upgradePrompt: !isPremium && !isTest,
+          callsUsed: usage.importsMonth,
+          callsLimit: importLimit
+        });
+      }
+      res.locals.aiCallsRemaining = Math.max(0, importLimit - usage.importsMonth - 1);
+      chargeOnSuccess(res, "__aiCharged", () => Promise.all([
+        storage.incrementImportCalls(userId),
+        storage.incrementGlobalAiCalls(VISION_CALL_UNITS),
+      ]));
+      return next();
+    }
+
+    // Test accounts: daily window. Free/premium: monthly window (the binding limit).
+    const limit = isTest ? TEST_TIER_DAILY_LIMIT : isPremium ? PREMIUM_MONTHLY_SUGGESTIONS : FREE_MONTHLY_SUGGESTIONS;
+    const used = isTest ? usage.aiCallsToday : usage.aiCallsMonth;
+    if (used >= limit) {
       // At the limit: reject up front. No charge — we return before hooking the response.
       return res.status(429).json({
-        error: "Daily assistant limit reached",
-        upgradePrompt: true,
-        callsUsed: usage.aiCallsToday,
+        error: isTest ? "Daily assistant limit reached"
+          : isPremium ? "You've reached this month's fair-use limit — it resets on the 1st."
+          : "Monthly suggestions limit reached",
+        upgradePrompt: !isPremium && !isTest,
+        callsUsed: used,
         callsLimit: limit
       });
     }
 
     // Remaining AFTER this (pending) call, so handlers surface an accurate count.
-    res.locals.aiCallsRemaining = isPremium ? UNLIMITED : Math.max(0, limit - usage.aiCallsToday - 1);
-    // Vision-mode screenshot imports run on Sonnet + image tokens (~an order of magnitude
-    // pricier than the Haiku paths), so they weigh more against the global daily ceiling.
-    const globalUnits = (req.body as any)?.mode === "image" ? VISION_CALL_UNITS : 1;
+    // Always a real number — the UNLIMITED (9999) sentinel is retired.
+    res.locals.aiCallsRemaining = Math.max(0, limit - used - 1);
     chargeOnSuccess(res, "__aiCharged", () => Promise.all([
       storage.incrementAiCalls(userId),
-      storage.incrementGlobalAiCalls(globalUnits),
+      storage.incrementGlobalAiCalls(1),
     ]));
     next();
   } catch (error) {
@@ -134,20 +173,29 @@ export async function copilotRateLimit(req: Request, res: Response, next: NextFu
     if (await globalBreakerTripped(res)) return;
 
     await storage.resetCopilotCallsIfNewDay(userId);
+    await storage.resetMonthlyCountersIfNewMonth(userId);
     const usage = await storage.getUserAiUsage(userId);
 
-    const isPremium = usage.subscriptionTier === 'premium';
-    const copilotLimit = usage.subscriptionTier === 'test' ? COPILOT_TEST_TIER_DAILY_LIMIT : COPILOT_FREE_TIER_DAILY_LIMIT;
-    if (!isPremium && usage.copilotCallsToday >= copilotLimit) {
+    const tier = usage.subscriptionTier;
+    const isPremium = tier === 'premium';
+    const isTest = tier === 'test';
+
+    // Test accounts: daily window. Free/premium: monthly window (the binding limit).
+    const copilotLimit = isTest ? COPILOT_TEST_TIER_DAILY_LIMIT : isPremium ? PREMIUM_MONTHLY_COPILOT : FREE_MONTHLY_COPILOT;
+    const used = isTest ? usage.copilotCallsToday : usage.copilotCallsMonth;
+    if (used >= copilotLimit) {
       return res.status(429).json({
-        error: "Daily Copilot chat limit reached",
-        upgradePrompt: true,
-        callsUsed: usage.copilotCallsToday,
+        error: isTest ? "Daily Copilot chat limit reached"
+          : isPremium ? "You've reached this month's fair-use limit — it resets on the 1st."
+          : "Monthly assistant message limit reached",
+        upgradePrompt: !isPremium && !isTest,
+        callsUsed: used,
         callsLimit: copilotLimit
       });
     }
 
-    res.locals.copilotCallsRemaining = isPremium ? UNLIMITED : Math.max(0, copilotLimit - usage.copilotCallsToday - 1);
+    // Always a real number — the UNLIMITED (9999) sentinel is retired.
+    res.locals.copilotCallsRemaining = Math.max(0, copilotLimit - used - 1);
     chargeOnSuccess(res, "__copilotCharged", () => Promise.all([
       storage.incrementCopilotCalls(userId),
       storage.incrementGlobalAiCalls(1),

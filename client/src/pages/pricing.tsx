@@ -63,8 +63,8 @@ export default function PricingPage() {
             </div>
             <ul className="space-y-4 mb-8 flex-1">
               {[
-                { label: "10 suggestions / day", icon: <Zap className="w-5 h-5 text-gray-400" /> },
-                { label: "30 assistant messages / day", icon: <MessageSquare className="w-5 h-5 text-gray-400" /> },
+                { label: "30 suggestions / month", icon: <Zap className="w-5 h-5 text-gray-400" /> },
+                { label: "100 assistant messages / month", icon: <MessageSquare className="w-5 h-5 text-gray-400" /> },
                 { label: "Shared household pantry", icon: <Utensils className="w-5 h-5 text-gray-400" /> },
                 { label: "Manual weekly planner", icon: <CalendarDays className="w-5 h-5 text-gray-400" /> },
                 { label: "Basic shopping list", icon: <ShoppingCart className="w-5 h-5 text-gray-400" /> },
@@ -102,7 +102,7 @@ export default function PricingPage() {
             </div>
             <ul className="space-y-4 mb-8 flex-1">
               {[
-                { label: "Unlimited suggestions & assistant messages", icon: <Sparkles className="w-5 h-5 text-orange-400" /> },
+                { label: "500 suggestions & 1,000 assistant messages / month", icon: <Sparkles className="w-5 h-5 text-orange-400" /> },
                 { label: "Generate 1-click weekly plans", icon: <Sparkles className="w-5 h-5 text-orange-400" /> },
                 { label: "Auto-categorized groceries", icon: <Sparkles className="w-5 h-5 text-orange-400" /> },
                 { label: "Nutrition & macros data", icon: <Check className="w-5 h-5 text-orange-400" /> },

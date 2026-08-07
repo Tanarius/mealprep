@@ -168,14 +168,14 @@ export default function LandingPage() {
     "Recipe library (unlimited)",
     "Shopping list generation",
     "Household sharing",
-    "10 suggestions / day",
-    "30 assistant messages / day",
+    "30 suggestions / month",
+    "100 assistant messages / month",
   ];
 
   const proFeatures = [
     "Everything in Free",
-    "Unlimited suggestions",
-    "Unlimited assistant messages",
+    "500 suggestions / month",
+    "1,000 assistant messages / month",
     "Priority support",
     "Early access to new features",
   ];

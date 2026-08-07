@@ -41,6 +41,13 @@ export function safeUser(user: any) {
   const todayStr = new Date().toISOString().split("T")[0];
   if (safe.aiCallsResetDate !== todayStr) safe.aiCallsToday = 0;
   if (safe.copilotResetDate !== todayStr) safe.copilotCallsToday = 0;
+  // Monthly counters share one key and reset together (resetMonthlyCountersIfNewMonth)
+  const monthKey = new Date().toISOString().slice(0, 7);
+  if (safe.usageMonthKey !== monthKey) {
+    safe.aiCallsMonth = 0;
+    safe.copilotCallsMonth = 0;
+    safe.importsMonth = 0;
+  }
   return safe;
 }
 

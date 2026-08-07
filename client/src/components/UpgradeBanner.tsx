@@ -36,7 +36,7 @@ export function UpgradeBanner() {
           className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors font-medium"
         >
           <Sparkles className="h-3.5 w-3.5 shrink-0" />
-          <span>You're on the free plan — <span className="underline underline-offset-2">upgrade for unlimited access</span></span>
+          <span>You're on the free plan — <span className="underline underline-offset-2">upgrade for more suggestions & messages</span></span>
         </button>
         <button
           onClick={dismiss}

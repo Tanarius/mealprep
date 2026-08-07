@@ -13,10 +13,10 @@ interface UpgradeModalProps {
 }
 
 const PERKS = [
-  "Unlimited recipe suggestions",
-  "Unlimited Kitchen Copilot messages",
-  "Unlimited weekly plan generation",
-  "Unlimited social media screenshot imports",
+  "500 recipe suggestions / month",
+  "1,000 assistant messages / month",
+  "One-click weekly plan generation",
+  "100 screenshot imports / month",
   "Up to 6 household members",
   "Full activity feed history",
   "Nutrition data on recipes",

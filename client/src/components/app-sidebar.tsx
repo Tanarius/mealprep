@@ -146,11 +146,16 @@ export function AppSidebar() {
 
             {/* Usage row */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {/* Test accounts run on a daily window; free/premium on a monthly one */}
               <span className="inline-flex items-center gap-1 bg-muted rounded-full px-2 py-0.5 font-mono tabular-nums">
-                Suggestions {user.aiCallsToday ?? 0}/{user.subscriptionTier === 'test' ? 200 : user.subscriptionTier === 'premium' ? '∞' : 10}
+                Suggestions {user.subscriptionTier === 'test'
+                  ? `${user.aiCallsToday ?? 0}/200`
+                  : `${user.aiCallsMonth ?? 0}/${user.subscriptionTier === 'premium' ? 500 : 30}`}
               </span>
               <span className="inline-flex items-center gap-1 bg-muted rounded-full px-2 py-0.5 font-mono tabular-nums">
-                Messages {user.copilotCallsToday ?? 0}/{user.subscriptionTier === 'test' ? 200 : user.subscriptionTier === 'premium' ? '∞' : 30}
+                Messages {user.subscriptionTier === 'test'
+                  ? `${user.copilotCallsToday ?? 0}/200`
+                  : `${user.copilotCallsMonth ?? 0}/${user.subscriptionTier === 'premium' ? 1000 : 100}`}
               </span>
             </div>
           </>

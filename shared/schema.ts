@@ -21,6 +21,12 @@ export const users = pgTable("users", {
   aiCallsResetDate: date("ai_calls_reset_date"),
   copilotCallsToday: integer("copilot_calls_today").notNull().default(0),
   copilotResetDate: date("copilot_reset_date"),
+  // Monthly usage windows (the binding limits for free/premium; "YYYY-MM" key shared
+  // by all three counters — they reset together on the calendar-month boundary)
+  aiCallsMonth: integer("ai_calls_month").notNull().default(0),
+  copilotCallsMonth: integer("copilot_calls_month").notNull().default(0),
+  importsMonth: integer("imports_month").notNull().default(0),
+  usageMonthKey: text("usage_month_key"),
   householdId: integer("household_id").references(() => households.id),
   stripeCustomerId: text("stripe_customer_id").unique(),
   stripeSubscriptionId: text("stripe_subscription_id"),

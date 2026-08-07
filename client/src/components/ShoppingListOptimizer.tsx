@@ -30,7 +30,7 @@ export function ShoppingListOptimizer({
       onOptimized(data.optimizedList);
       toast({
         title: "List Optimized",
-        description: `Removed pantry duplicates and organized by aisle ${data.callsRemaining !== 9999 ? `(${data.callsRemaining} suggestions left today)` : ''}`,
+        description: `Removed pantry duplicates and organized by aisle ${data.callsRemaining != null ? `(${data.callsRemaining} suggestions left)` : ''}`,
       });
     },
     onError: (err: any) => {

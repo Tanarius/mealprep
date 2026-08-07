@@ -49,11 +49,13 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  getUserAiUsage(userId: number): Promise<{ aiCallsToday: number; aiCallsResetDate: string | null; copilotCallsToday: number; copilotResetDate: string | null; subscriptionTier: string }>;
+  getUserAiUsage(userId: number): Promise<{ aiCallsToday: number; aiCallsResetDate: string | null; copilotCallsToday: number; copilotResetDate: string | null; aiCallsMonth: number; copilotCallsMonth: number; importsMonth: number; usageMonthKey: string | null; subscriptionTier: string }>;
   incrementAiCalls(userId: number): Promise<{ newCount: number }>;
   incrementCopilotCalls(userId: number): Promise<{ newCount: number }>;
+  incrementImportCalls(userId: number): Promise<{ newCount: number }>;
   resetAiCallsIfNewDay(userId: number): Promise<void>;
   resetCopilotCallsIfNewDay(userId: number): Promise<void>;
+  resetMonthlyCountersIfNewMonth(userId: number): Promise<void>;
   getGlobalAiCallsToday(): Promise<number>;
   incrementGlobalAiCalls(units: number): Promise<void>;
   claimGlobalAiAlert(kind: "soft" | "hard"): Promise<boolean>;
@@ -164,6 +166,11 @@ export class DatabaseStorage implements IStorage {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expiry TIMESTAMP`);
+    // Monthly usage windows (finite tier caps)
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_calls_month INTEGER NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS copilot_calls_month INTEGER NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS imports_month INTEGER NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS usage_month_key TEXT`);
 
     // User preference columns added for onboarding v2
     await pool.query(`ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS cooking_styles TEXT[] DEFAULT '{}'`);
@@ -308,6 +315,10 @@ export class DatabaseStorage implements IStorage {
       aiCallsResetDate: user.aiCallsResetDate,
       copilotCallsToday: user.copilotCallsToday,
       copilotResetDate: user.copilotResetDate,
+      aiCallsMonth: user.aiCallsMonth,
+      copilotCallsMonth: user.copilotCallsMonth,
+      importsMonth: user.importsMonth,
+      usageMonthKey: user.usageMonthKey,
       subscriptionTier: user.subscriptionTier,
     };
   }
@@ -317,7 +328,10 @@ export class DatabaseStorage implements IStorage {
   // date is already today by the time we get here. Returns the new count.
   async incrementAiCalls(userId: number): Promise<{ newCount: number }> {
     const rows = await db.update(users)
-      .set({ aiCallsToday: sql`${users.aiCallsToday} + 1` })
+      .set({
+        aiCallsToday: sql`${users.aiCallsToday} + 1`,
+        aiCallsMonth: sql`${users.aiCallsMonth} + 1`,
+      })
       .where(eq(users.id, userId))
       .returning();
     if (!rows[0]) throw new Error("User not found");
@@ -326,11 +340,23 @@ export class DatabaseStorage implements IStorage {
 
   async incrementCopilotCalls(userId: number): Promise<{ newCount: number }> {
     const rows = await db.update(users)
-      .set({ copilotCallsToday: sql`${users.copilotCallsToday} + 1` })
+      .set({
+        copilotCallsToday: sql`${users.copilotCallsToday} + 1`,
+        copilotCallsMonth: sql`${users.copilotCallsMonth} + 1`,
+      })
       .where(eq(users.id, userId))
       .returning();
     if (!rows[0]) throw new Error("User not found");
     return { newCount: rows[0].copilotCallsToday };
+  }
+
+  async incrementImportCalls(userId: number): Promise<{ newCount: number }> {
+    const rows = await db.update(users)
+      .set({ importsMonth: sql`${users.importsMonth} + 1` })
+      .where(eq(users.id, userId))
+      .returning();
+    if (!rows[0]) throw new Error("User not found");
+    return { newCount: rows[0].importsMonth };
   }
 
   async resetAiCallsIfNewDay(userId: number): Promise<void> {
@@ -348,6 +374,19 @@ export class DatabaseStorage implements IStorage {
     const todayStr = new Date().toISOString().split('T')[0];
     if (user.copilotResetDate !== todayStr) {
       await db.update(users).set({ copilotCallsToday: 0, copilotResetDate: todayStr }).where(eq(users.id, userId));
+    }
+  }
+
+  // All three monthly counters share one "YYYY-MM" key and reset together on the
+  // calendar-month boundary — same lazy pattern as the daily helpers above.
+  async resetMonthlyCountersIfNewMonth(userId: number): Promise<void> {
+    const user = await this.getUser(userId);
+    if (!user) return;
+    const monthKey = new Date().toISOString().slice(0, 7);
+    if (user.usageMonthKey !== monthKey) {
+      await db.update(users)
+        .set({ aiCallsMonth: 0, copilotCallsMonth: 0, importsMonth: 0, usageMonthKey: monthKey })
+        .where(eq(users.id, userId));
     }
   }
 

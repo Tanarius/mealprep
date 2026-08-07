@@ -18,10 +18,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../storage", () => ({
   storage: {
     resetAiCallsIfNewDay: vi.fn(),
+    resetCopilotCallsIfNewDay: vi.fn(),
+    resetMonthlyCountersIfNewMonth: vi.fn(),
     getUserAiUsage: vi.fn(),
     incrementAiCalls: vi.fn(),
-    resetCopilotCallsIfNewDay: vi.fn(),
     incrementCopilotCalls: vi.fn(),
+    incrementImportCalls: vi.fn(),
     getGlobalAiCallsToday: vi.fn(),
     incrementGlobalAiCalls: vi.fn(),
     claimGlobalAiAlert: vi.fn(),
@@ -75,9 +77,15 @@ beforeEach(() => {
   vi.clearAllMocks();
   s.resetAiCallsIfNewDay.mockResolvedValue(undefined);
   s.resetCopilotCallsIfNewDay.mockResolvedValue(undefined);
-  s.getUserAiUsage.mockResolvedValue({ subscriptionTier: "free", aiCallsToday: 0, copilotCallsToday: 0 });
+  s.resetMonthlyCountersIfNewMonth.mockResolvedValue(undefined);
+  s.getUserAiUsage.mockResolvedValue({
+    subscriptionTier: "free",
+    aiCallsToday: 0, copilotCallsToday: 0,
+    aiCallsMonth: 0, copilotCallsMonth: 0, importsMonth: 0,
+  });
   s.incrementAiCalls.mockResolvedValue({ newCount: 1 });
   s.incrementCopilotCalls.mockResolvedValue({ newCount: 1 });
+  s.incrementImportCalls.mockResolvedValue({ newCount: 1 });
   s.getGlobalAiCallsToday.mockResolvedValue(0);
   s.incrementGlobalAiCalls.mockResolvedValue(undefined);
   s.claimGlobalAiAlert.mockResolvedValue(false);

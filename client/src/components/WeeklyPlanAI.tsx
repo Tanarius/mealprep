@@ -42,7 +42,7 @@ export function WeeklyPlanAI({ onPlanGenerated }: { onPlanGenerated: (plan: any)
       onPlanGenerated(data.meals);
       toast({
         title: "Simmer filled your week",
-        description: `Filled your week from your recipe library. ${data.callsRemaining !== 9999 ? `(${data.callsRemaining} suggestions left today)` : ''}`,
+        description: `Filled your week from your recipe library. ${data.callsRemaining != null ? `(${data.callsRemaining} suggestions left)` : ''}`,
       });
     },
     onError: (err: any) => {
